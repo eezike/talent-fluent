@@ -2,6 +2,7 @@ import "dotenv/config";
 import { PubSub } from "@google-cloud/pubsub";
 import { createGmailClient } from "./gmailClient";
 import { getLastHistoryId, setLastHistoryId } from "./historyStore";
+import { classifyEmail, ParsedEmail } from "./classifier";
 
 const PROJECT_ID = process.env.GCP_PROJECT_ID!;
 const SUBSCRIPTION_ID = process.env.PUBSUB_SUB_ID || "gmail-events-local-sub";
@@ -68,19 +69,19 @@ async function processGmailNotification(payload: GmailPushPayload) {
       // - parse full body
       // - run classifier
       // - upsert campaign / notes into DB
-      import { classifyEmail, ParsedEmail } from "./classifier";
-      
-      
+
       // inside for each message:
-      const parsed: ParsedEmail = {from, subject, snippet: snippet || "",};
-      
+      const parsed: ParsedEmail = { from, subject, snippet: snippet || "" };
+
       const classification = classifyEmail(parsed);
-      
+
       console.log("Classification:", classification);
-      
+
       if (classification.isCampaign) {
-        console.log("👉 This looks like a campaign email. (In the future: create/find campaign, add notes.)");
-        }
+        console.log(
+          "👉 This looks like a campaign email. (In the future: create/find campaign, add notes.)"
+        );
+      }
     }
   }
 
@@ -98,7 +99,7 @@ async function main() {
 
   subscription.on("message", async (message) => {
     try {
-    const dataStr = message.data.toString("utf8");
+      const dataStr = message.data.toString("utf8");
       const payload: GmailPushPayload = JSON.parse(dataStr);
 
       console.log("\n📩 Received Gmail push notification:", payload);

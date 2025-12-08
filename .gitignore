@@ -1,0 +1,10 @@
+node_modules/
+*.log
+.DS_Store
+.env
+tokens.json
+history.json
+client_secret_*.json
+*.crt
+*.pem
+*.p12
