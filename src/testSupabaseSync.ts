@@ -16,7 +16,6 @@ async function main() {
   const extraction: CampaignExtraction = {
     campaignName: "Glow Shift Launch",
     brand: "Aurora Skincare",
-    threadId: "19b6a98e70b22866",
     draftRequired: "required",
     exclusivity:
       "30 days exclusivity for skincare brands (no competing skincare content from 2025-01-10 to 2025-02-09)",
@@ -60,7 +59,7 @@ async function main() {
   };
 
   const context: CampaignContext = {
-    threadId: extraction.threadId ?? "test-thread-id",
+    threadId: "19b6a98e70b22866",
     subject: 'Campaign: Aurora Skincare - "Glow Shift" Launch (Draft + Go-Live)',
     from: "Frank Ezike <franklinezike@gmail.com>",
     bodyPreview: "Test payload generated for admin API validation.",
