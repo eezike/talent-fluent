@@ -45,3 +45,8 @@ Optional:
 3) Add service account JSON:
    - `fly secrets set GOOGLE_APPLICATION_CREDENTIALS_JSON="$(cat /path/to/service-account.json)"`
 4) `fly deploy`
+
+## Google credentials note (local vs Fly)
+- Local runs typically use a file path: `GOOGLE_APPLICATION_CREDENTIALS=./.secrets/your.json`.
+- Fly uses the JSON secret: `GOOGLE_APPLICATION_CREDENTIALS_JSON`, which the startup script writes to `/app/.secrets/service-account.json`.
+- If you set both on Fly, the file path wins and can break; only set the JSON secret in Fly.
