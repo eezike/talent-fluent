@@ -32,6 +32,8 @@
       // (Optional but helpful for Node-style imports)
       "esModuleInterop": true,
       "allowSyntheticDefaultImports": true
-    }
+    },
+    "include": ["src/**/*"],
+    "exclude": ["tests", "dist", "node_modules"]
   }
   
