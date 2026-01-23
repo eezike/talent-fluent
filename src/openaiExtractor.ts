@@ -21,6 +21,8 @@ export interface CampaignRequiredAction {
 }
 
 export interface CampaignExtraction {
+  isBrandDeal: boolean;
+  brandDealReason: string | null;
   campaignName: string | null;
   brand: string | null;
   draftRequired: DraftRequirement | null;
@@ -56,6 +58,8 @@ const campaignExtractionSchema = {
     type: "object",
     additionalProperties: false,
     properties: {
+      isBrandDeal: { type: "boolean" },
+      brandDealReason: { type: ["string", "null"] },
       campaignName: { type: ["string", "null"] },
       brand: { type: ["string", "null"] },
       draftRequired: {
@@ -101,6 +105,8 @@ const campaignExtractionSchema = {
       notes: { type: ["string", "null"] },
     },
     required: [
+      "isBrandDeal",
+      "brandDealReason",
       "campaignName",
       "brand",
       "draftRequired",
@@ -180,10 +186,14 @@ async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
 /**
  * Call OpenAI to extract structured campaign details from an email.
  */
-export async function extractCampaignDetails(
-  email: CampaignContext
-): Promise<CampaignExtraction> {
+export async function extractCampaignDetailsWithMeta(email: CampaignContext): Promise<{
+  extraction: CampaignExtraction;
+  usage: OpenAI.Completions.CompletionUsage | null;
+  latencyMs: number;
+  model: string;
+}> {
   const prompt = buildPrompt(email);
+  const start = Date.now();
 
   const completion = await withRetry<OpenAI.Chat.Completions.ChatCompletion>(
     () =>
@@ -195,13 +205,14 @@ export async function extractCampaignDetails(
           {
             role: "system",
             content:
-              "You are an assistant that extracts structured campaign data from influencer/brand emails. If a field is missing, return null or an empty list as appropriate.",
+              "You are an assistant that extracts structured campaign data from influencer/brand emails and decides if the email is actually about a brand deal. If isBrandDeal is false, return null for all other scalar fields (except brandDealReason) and empty lists for arrays. If a field is missing, return null or an empty list as appropriate.",
           },
           { role: "user", content: prompt },
         ],
       }),
     "openai.chat.completions.create"
   );
+  const latencyMs = Date.now() - start;
 
   const content = completion.choices[0]?.message?.content;
   if (!content) {
@@ -210,10 +221,22 @@ export async function extractCampaignDetails(
 
   try {
     const parsed = JSON.parse(content) as CampaignExtraction;
-    return parsed;
+    return {
+      extraction: parsed,
+      usage: completion.usage ?? null,
+      latencyMs,
+      model: completion.model ?? OPENAI_MODEL,
+    };
   } catch (err) {
     throw new Error(`Failed to parse OpenAI response: ${err}`);
   }
+}
+
+export async function extractCampaignDetails(
+  email: CampaignContext
+): Promise<CampaignExtraction> {
+  const { extraction } = await extractCampaignDetailsWithMeta(email);
+  return extraction;
 }
 
 /**
@@ -221,7 +244,7 @@ export async function extractCampaignDetails(
  */
 function buildPrompt(email: CampaignContext): string {
   return `
-Extract campaign details from this email. Use null for unknown values. If this is a reply or update, prefer the most recent explicit changes (for example updated payment amounts, payment terms, or invoice sent status). If the email includes quoted prior messages, ignore outdated values and use the newest values from the latest reply. Use UTC ISO 8601 timestamps for all date-time fields.
+Extract campaign details from this email. First decide if the email is actually about a brand deal/influencer campaign (true/false) and explain briefly why. If isBrandDeal is false, return null for all other scalar fields (except brandDealReason) and empty lists for arrays. Use null for unknown values. If this is a reply or update, prefer the most recent explicit changes (for example updated payment amounts, payment terms, or invoice sent status). If the email includes quoted prior messages, ignore outdated values and use the newest values from the latest reply. Use UTC ISO 8601 timestamps for all date-time fields.
 
 Email metadata:
 - From: ${email.from}

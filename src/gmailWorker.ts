@@ -146,6 +146,11 @@ export async function processGmailNotification(
         const extraction = await extractCampaignDetails(campaignContext);
         console.log("OpenAI extraction:", extraction);
 
+        if (!extraction.isBrandDeal) {
+          console.log("Skipping non-brand-deal email:", extraction.brandDealReason);
+          continue;
+        }
+
         try {
           const result = await upsertDealFromExtraction(
             supabase,
