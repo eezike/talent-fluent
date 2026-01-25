@@ -1,6 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import type {
-  CampaignContext,
+  CampaignEmail,
   CampaignExtraction,
 } from "../aiExtractor/aiExtractorModels";
 import { PaymentStatus, UrgencyLevel } from "../aiExtractor/aiExtractorEnums";
@@ -105,7 +105,7 @@ function normalizeDateTime(value: string | null | undefined) {
 export async function upsertDealFromExtraction(
   supabase: SupabaseClient,
   extraction: CampaignExtraction,
-  context: CampaignContext,
+  context: CampaignEmail,
   userId: string
 ) {
   const draftDeadline = normalizeDateTime(extraction.draftDeadline);

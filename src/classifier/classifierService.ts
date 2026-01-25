@@ -17,7 +17,7 @@ function hasMoneySignal(text: string) {
  * Quick keyword-based check to decide if an email is likely a campaign.
  */
 export function classifyEmail(email: ParsedEmail): Classification {
-  const text = `${email.subject} ${email.snippet}`.toLowerCase();
+  const text = `${email.subject} ${email.bodyText}`.toLowerCase();
   const from = email.from.toLowerCase();
 
   const strongMatches = matchKeywords(text, STRONG_CAMPAIGN_KEYWORDS);

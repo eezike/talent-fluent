@@ -1,11 +1,11 @@
 import "dotenv/config";
 import assert from "node:assert/strict";
-import type { CampaignContext } from "../src/aiExtractor/aiExtractorModels";
+import type { CampaignEmail } from "../src/aiExtractor/aiExtractorModels";
 import { extractCampaignDetailsWithMeta } from "../src/aiExtractor/aiExtractorService";
 
 type TestCase = {
   name: string;
-  context: CampaignContext;
+  context: CampaignEmail;
   expectBrandDeal: boolean;
   expectBrandName?: boolean;
 };
@@ -16,8 +16,9 @@ const cases: TestCase[] = [
     context: {
       subject: "Brand deal: WaveSkin campaign brief",
       from: "Avery <partnerships@waveskin.example>",
-      bodyPreview:
+      body:
         "Hi! We'd love to work with you on a paid partnership. Budget is $2,500 for two TikTok videos and one IG reel. Usage rights for 6 months. Go-live window March 10-20. Please confirm.",
+      receivedAt: "2025-01-20T18:30:00.000Z",
     },
     expectBrandDeal: true,
     expectBrandName: true,
@@ -27,8 +28,9 @@ const cases: TestCase[] = [
     context: {
       subject: "Password reset request",
       from: "Security <no-reply@bank.example>",
-      bodyPreview:
+      body:
         "We received a request to reset your password. If this wasn't you, ignore this email.",
+      receivedAt: "2025-01-20T18:35:00.000Z",
     },
     expectBrandDeal: false,
   },
@@ -37,8 +39,9 @@ const cases: TestCase[] = [
     context: {
       subject: "Quick collab opportunity",
       from: "Jamie <jamie@agency.example>",
-      bodyPreview:
+      body:
         "We have a collab opportunity for your channel. Paid partnership, budget $700, deliverables: 1 reel + 3 stories. Timeline next month.",
+      receivedAt: "2025-01-20T18:40:00.000Z",
     },
     expectBrandDeal: true,
     expectBrandName: false,

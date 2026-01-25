@@ -3,7 +3,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { classifyEmail } from "../classifier/classifierService";
 import type { ParsedEmail } from "../classifier/classifierModels";
 import { extractPlainText } from "./gmailParserService";
-import type { CampaignContext } from "../aiExtractor/aiExtractorModels";
+import type { CampaignEmail } from "../aiExtractor/aiExtractorModels";
 import { extractCampaignDetails } from "../aiExtractor/aiExtractorService";
 import { upsertDealFromExtraction } from "../dealSync/dealSyncService";
 import type { EnvConfig } from "../env/envModels";
@@ -17,6 +17,7 @@ import {
 import { isRateLimitError, withRetry } from "../utils/retry";
 import {
   BASE_RETRY_DELAY_MS,
+  MAX_BODY_TEXT_CHARS,
   MAX_GMAIL_RETRIES,
   MAX_HISTORY_RESULTS,
 } from "./gmailConstants";
@@ -39,22 +40,25 @@ async function handleCampaignFromMessage(input: {
   from: string;
   snippet: string | null | undefined;
   bodyText: string;
+  receivedAt: string | null;
 }) {
+  const cappedBodyText = input.bodyText.slice(0, MAX_BODY_TEXT_CHARS);
   const parsed: ParsedEmail = {
     from: input.from,
     subject: input.subject,
-    snippet: `${input.snippet || ""}\n\n${input.bodyText}`.trim(),
+    bodyText: cappedBodyText,
   };
   const classification = classifyEmail(parsed);
   console.log("Classification:", classification);
 
   if (!classification.isCampaign) return;
 
-  const campaignContext: CampaignContext = {
+  const campaignContext: CampaignEmail = {
     ...(input.message.threadId ? { threadId: input.message.threadId } : {}),
     subject: input.subject,
     from: input.from,
-    bodyPreview: parsed.snippet,
+    body: cappedBodyText,
+    receivedAt: input.receivedAt,
   };
 
   const extraction = await extractCampaignDetails(campaignContext);
@@ -168,6 +172,9 @@ export async function processGmailNotification(
       const snippet = message.snippet;
       const headers = message.payload?.headers || [];
       const bodyText = extractPlainText(message);
+      const receivedAt = message.internalDate
+        ? new Date(Number(message.internalDate)).toISOString()
+        : null;
 
       const subject =
         headers.find((h) => h.name === "Subject")?.value || "(no subject)";
@@ -187,6 +194,7 @@ export async function processGmailNotification(
         from,
         snippet,
         bodyText,
+        receivedAt,
       });
     }
   }

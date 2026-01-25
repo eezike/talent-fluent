@@ -1,7 +1,7 @@
 export type ParsedEmail = {
   from: string;
   subject: string;
-  snippet: string;
+  bodyText: string;
 };
 
 export type Classification = {

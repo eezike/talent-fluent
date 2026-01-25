@@ -14,7 +14,8 @@ const cases: TestCase[] = [
     email: {
       from: "Security Bot <no-reply@bank.example>",
       subject: "Your verification code",
-      snippet: "Use this code to reset your password. This is an automated message.",
+      bodyText:
+        "Use this code to reset your password. This is an automated message.",
     },
     expectCampaign: false,
   },
@@ -23,7 +24,7 @@ const cases: TestCase[] = [
     email: {
       from: "Marketing Updates <no-reply@newsletter.example>",
       subject: "Sponsorship opportunity inside",
-      snippet:
+      bodyText:
         "Read our newsletter for creator news. Unsubscribe anytime. This is not an offer.",
     },
     expectCampaign: false,
@@ -33,7 +34,7 @@ const cases: TestCase[] = [
     email: {
       from: "Acme Partnerships <partnerships@acme.example>",
       subject: "Campaign brief and statement of work",
-      snippet:
+      bodyText:
         "Sharing the statement of work and usage rights. Budget is $1500 for two deliverables.",
     },
     expectCampaign: true,
@@ -43,7 +44,8 @@ const cases: TestCase[] = [
     email: {
       from: "Jamie <jamie@agency.example>",
       subject: "Quick collab?",
-      snippet: "We have a collab opportunity. Budget is $500. Timeline next month.",
+      bodyText:
+        "We have a collab opportunity. Budget is $500. Timeline next month.",
     },
     expectCampaign: true,
   },
