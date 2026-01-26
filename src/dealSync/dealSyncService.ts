@@ -172,6 +172,111 @@ function typeToLabel(type: string) {
   }
 }
 
+type ReminderInsert = {
+  deal_id: string;
+  type: "deliverable" | "do" | "dont";
+  text: string;
+  is_critical: boolean;
+  order_index: number;
+  source: "email";
+};
+
+function buildActionReminderText(name: string, description: string | null) {
+  const trimmedName = name.trim();
+  if (!trimmedName) return "";
+  if (description?.trim()) {
+    return `${trimmedName}: ${description.trim()}`;
+  }
+  return trimmedName;
+}
+
+function buildDeliverableReminderText(deliverable: CampaignExtraction["deliverables"][number]) {
+  const quantity = deliverable.quantity ?? 1;
+  const label = formatDeliverableLabel(deliverable.platform, deliverable.type) ?? "Deliverable";
+  const base = `${quantity} ${quantity === 1 ? label : pluralizeLabel(label)}`;
+  const description = deliverable.description?.trim()
+    ? `: ${deliverable.description.trim()}`
+    : "";
+  const dueDate = deliverable.dueDateRawText ?? deliverable.dueDate;
+  const due = dueDate ? ` (Due ${dueDate})` : "";
+  return `${base}${description}${due}`.trim();
+}
+
+function buildReminderPayloads(
+  dealId: string,
+  extraction: CampaignExtraction
+): ReminderInsert[] {
+  const reminders: ReminderInsert[] = [];
+
+  extraction.requiredActions.forEach((action, index) => {
+    const text = buildActionReminderText(action.name, action.description);
+    if (!text) return;
+    reminders.push({
+      deal_id: dealId,
+      type: "do",
+      text,
+      is_critical: false,
+      order_index: index,
+      source: "email",
+    });
+  });
+
+  extraction.mustAvoids.forEach((action, index) => {
+    const text = buildActionReminderText(action.name, action.description);
+    if (!text) return;
+    reminders.push({
+      deal_id: dealId,
+      type: "dont",
+      text,
+      is_critical: false,
+      order_index: index,
+      source: "email",
+    });
+  });
+
+  extraction.deliverables.forEach((deliverable, index) => {
+    const text = buildDeliverableReminderText(deliverable);
+    if (!text) return;
+    reminders.push({
+      deal_id: dealId,
+      type: "deliverable",
+      text,
+      is_critical: false,
+      order_index: index,
+      source: "email",
+    });
+  });
+
+  return reminders;
+}
+
+async function syncRemindersFromExtraction(
+  supabase: SupabaseClient,
+  dealId: string,
+  extraction: CampaignExtraction
+) {
+  const { error: deleteError } = await supabase
+    .from("reminders")
+    .delete()
+    .eq("deal_id", dealId)
+    .eq("source", "email");
+
+  if (deleteError) {
+    throw new Error(`Failed to clear email reminders: ${deleteError.message}`);
+  }
+
+  const reminders = buildReminderPayloads(dealId, extraction);
+  if (!reminders.length) return;
+
+  const { error: insertError } = await supabase
+    .from("reminders")
+    .insert(reminders);
+
+  if (insertError) {
+    throw new Error(`Failed to insert reminders: ${insertError.message}`);
+  }
+}
+
 /**
  * Convert a go-live window into a display-ready string.
  */
@@ -213,6 +318,25 @@ export type DealUpsertPayload = {
   invoice_sent_date: string | null;
   expected_payment_date: string | null;
 };
+
+type DealSyncLogInsert = {
+  deal_id: string;
+  user_id: string;
+  email_thread_id: string | null;
+  created_from: "email";
+  status: "created" | "updated";
+  deliverable_summary: string;
+};
+
+async function insertDealSyncLog(
+  supabase: SupabaseClient,
+  log: DealSyncLogInsert
+) {
+  const { error } = await supabase.from("deal_sync_logs").insert(log);
+  if (error) {
+    console.error("Failed to write deal sync log:", error.message);
+  }
+}
 
 
 export function buildDealPayloadFromExtraction(
@@ -299,6 +423,16 @@ export async function upsertDealFromExtraction(
         throw new Error(`Failed to update deal: ${updateError.message}`);
       }
 
+      await syncRemindersFromExtraction(supabase, existing.id, extraction);
+      await insertDealSyncLog(supabase, {
+        deal_id: existing.id,
+        user_id: userId,
+        email_thread_id: context.threadId ?? null,
+        created_from: "email",
+        status: "updated",
+        deliverable_summary: payload.deliverable_summary,
+      });
+
       return { id: existing.id, created: false };
     }
   }
@@ -312,6 +446,16 @@ export async function upsertDealFromExtraction(
   if (insertError) {
     throw new Error(`Failed to insert deal: ${insertError.message}`);
   }
+
+  await syncRemindersFromExtraction(supabase, inserted.id, extraction);
+  await insertDealSyncLog(supabase, {
+    deal_id: inserted.id,
+    user_id: userId,
+    email_thread_id: context.threadId ?? null,
+    created_from: "email",
+    status: "created",
+    deliverable_summary: payload.deliverable_summary,
+  });
 
   return { id: inserted.id, created: true };
 }
