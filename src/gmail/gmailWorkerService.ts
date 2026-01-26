@@ -4,8 +4,11 @@ import { classifyEmail } from "../classifier/classifierService";
 import type { ParsedEmail } from "../classifier/classifierModels";
 import { extractPlainText } from "./gmailParserService";
 import type { CampaignEmail } from "./gmailModels";
-import { extractCampaignDetails } from "../aiExtractor/aiExtractorService";
-import { upsertDealFromExtraction } from "../dealSync/dealSyncService";
+import { extractCampaignDetailsWithMeta } from "../aiExtractor/aiExtractorService";
+import {
+  insertDealExtraction,
+  upsertDealFromExtraction,
+} from "../dealSync/dealSyncService";
 import type { EnvConfig } from "../env/envModels";
 import { fetchConnectionByEmail } from "./gmailDao";
 import { ensureWatchForConnection } from "../watch/gmailWatchService";
@@ -61,7 +64,8 @@ async function handleCampaignFromMessage(input: {
     receivedAt: input.receivedAt,
   };
 
-  const extraction = await extractCampaignDetails(campaignContext);
+  const response = await extractCampaignDetailsWithMeta(campaignContext);
+  const { extraction } = response;
   console.log("OpenAI extraction:", extraction);
 
   // TODO: add code to serialize extraction to make sure it fits what we expects
@@ -79,6 +83,16 @@ async function handleCampaignFromMessage(input: {
       input.connectionUserId
     );
     console.log(`Supabase ${result.created ? "created" : "updated"} deal`, result.id);
+    try {
+      await insertDealExtraction(input.supabase, {
+        dealId: result.id,
+        userId: input.connectionUserId,
+        emailThreadId: campaignContext.threadId ?? null,
+        response,
+      });
+    } catch (err) {
+      console.error("Failed to store OpenAI extraction:", err);
+    }
   } catch (err) {
     console.error("Failed to sync to Supabase:", err);
   }

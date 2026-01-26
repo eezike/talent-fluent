@@ -1,5 +1,8 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import type { CampaignExtraction } from "../aiExtractor/strategies/all_in_one/models";
+import type {
+  CampaignExtraction,
+  CampaignExtractionMetadata,
+} from "../aiExtractor/strategies/all_in_one/models";
 import type { CampaignEmail } from "../gmail/gmailModels";
 import { PaymentStatus, UrgencyLevel } from "./dealSyncEnums";
 
@@ -319,22 +322,32 @@ export type DealUpsertPayload = {
   expected_payment_date: string | null;
 };
 
-type DealSyncLogInsert = {
+type DealExtractionInsert = {
   deal_id: string;
   user_id: string;
   email_thread_id: string | null;
-  created_from: "email";
-  status: "created" | "updated";
-  deliverable_summary: string;
+  response: CampaignExtractionMetadata;
 };
 
-async function insertDealSyncLog(
+export async function insertDealExtraction(
   supabase: SupabaseClient,
-  log: DealSyncLogInsert
+  input: {
+    dealId: string;
+    userId: string;
+    emailThreadId: string | null;
+    response: CampaignExtractionMetadata;
+  }
 ) {
-  const { error } = await supabase.from("deal_sync_logs").insert(log);
+  const payload: DealExtractionInsert = {
+    deal_id: input.dealId,
+    user_id: input.userId,
+    email_thread_id: input.emailThreadId,
+    response: input.response,
+  };
+
+  const { error } = await supabase.from("deal_extractions").insert(payload);
   if (error) {
-    console.error("Failed to write deal sync log:", error.message);
+    throw new Error(`Failed to insert deal extraction: ${error.message}`);
   }
 }
 
@@ -413,7 +426,7 @@ export async function upsertDealFromExtraction(
       throw new Error(`Failed to query existing deal: ${existingError.message}`);
     }
 
-    if (existing?.id) {
+  if (existing?.id) {
       const { error: updateError } = await supabase
         .from("deals")
         .update(payload)
@@ -424,15 +437,6 @@ export async function upsertDealFromExtraction(
       }
 
       await syncRemindersFromExtraction(supabase, existing.id, extraction);
-      await insertDealSyncLog(supabase, {
-        deal_id: existing.id,
-        user_id: userId,
-        email_thread_id: context.threadId ?? null,
-        created_from: "email",
-        status: "updated",
-        deliverable_summary: payload.deliverable_summary,
-      });
-
       return { id: existing.id, created: false };
     }
   }
@@ -448,14 +452,5 @@ export async function upsertDealFromExtraction(
   }
 
   await syncRemindersFromExtraction(supabase, inserted.id, extraction);
-  await insertDealSyncLog(supabase, {
-    deal_id: inserted.id,
-    user_id: userId,
-    email_thread_id: context.threadId ?? null,
-    created_from: "email",
-    status: "created",
-    deliverable_summary: payload.deliverable_summary,
-  });
-
   return { id: inserted.id, created: true };
 }

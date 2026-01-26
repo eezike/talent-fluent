@@ -53,6 +53,7 @@ export async function extractCampaignDetailsWithMeta(
       latencyMs,
       model: completion.model ?? OPENAI_MODEL,
       retries,
+      rawContent: content,
     };
   } catch (err) {
     throw new Error(`Failed to parse OpenAI response: ${err}`);

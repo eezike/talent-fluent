@@ -118,4 +118,5 @@ export interface CampaignExtractionMetadata {
   latencyMs: number;
   model: string;
   retries: number;
+  rawContent: string;
 }
